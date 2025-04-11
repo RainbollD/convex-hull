@@ -1,8 +1,6 @@
 import os
 from itertools import combinations
 
-from scipy.constants import point
-
 
 class PointsXYZ:
     def __init__(self, x, y, z):
@@ -158,6 +156,75 @@ def print_correct_planes(faces):
     print("\n".join(planes))
 
 
+def count3x3(three_points):
+    one, two, three = three_points
+    return (one.a * (two.b * three.c - two.c * three.b) -
+            one.b * (two.a * three.c - two.c * three.a) +
+            one.c * (two.a * three.b - two.b * three.a))
+
+
+def transform_float_to_int(top):
+    if int(top) == float(top):
+        return int(top)
+    return top
+
+
+def count_3x3_first_d(three_points, delta_a):
+    one, two, three = three_points
+    return transform_float_to_int((one.d * (two.b * three.c - two.c * three.b) -
+                                   one.b * (two.d * three.c - two.c * three.d) +
+                                   one.c * (two.d * three.b - two.b * three.d)) / delta_a)
+
+
+def count_3x3_second_d(three_points, delta_a):
+    one, two, three = three_points
+    return transform_float_to_int((one.a * (two.d * three.c - two.c * three.d) -
+                                   one.d * (two.a * three.c - two.c * three.a) +
+                                   one.c * (two.a * three.d - two.d * three.a)) / delta_a)
+
+
+def count_3x3_third_d(three_points, delta_a):
+    one, two, three = three_points
+    return transform_float_to_int((one.a * (two.b * three.d - two.d * three.b) -
+                                   one.b * (two.a * three.d - two.d * three.a) +
+                                   one.d * (two.a * three.b - two.b * three.a)) / delta_a)
+
+
+def count_delta(three_points):
+    delta_a = count3x3(three_points)
+    delta_x = count_3x3_first_d(three_points, delta_a)
+    delta_y = count_3x3_second_d(three_points, delta_a)
+    delta_z = count_3x3_third_d(three_points, delta_a)
+    return map(str, (delta_x, delta_y, delta_z))
+
+
+def find_tops(points):
+    tops = set()
+    for three_points in combinations(points, 3):
+        tops.add(count_delta(three_points))
+    return tops
+
+
+def full_names_tops(tops):
+    names_tops = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
+                  "U", "V", "W",
+                  "X", "Y", "Z"]
+    i = 0
+    while len(names_tops) < len(tops):
+        names_tops.append(names_tops[i] + '1')
+    return names_tops
+
+
+def print_tops(tops):
+    names_tops = full_names_tops(tops)
+    for name, top in zip(names_tops, tops):
+        print(f"{name}: {' '.join(list(top))}")
+
+
+def polyhedral_graph(faces, points):
+
+
+
 def main():
     filepath = r'tets/new_test.txt'
     is_file(filepath)
@@ -167,8 +234,13 @@ def main():
     if file_format == 'V':
         faces = find_convex_hull(points)
         print_correct_planes(faces)
+        tops = find_tops(faces)
     elif file_format == 'H':
-        print(points)
+        faces = points
+        tops = find_tops(points)
+        print_tops(tops)
+
+    polyhedral_graph(faces, tops)
 
 
 if __name__ == '__main__':
