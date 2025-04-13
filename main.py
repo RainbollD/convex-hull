@@ -1,3 +1,4 @@
+import itertools
 import os
 from itertools import combinations
 
@@ -125,7 +126,7 @@ def find_convex_hull(points):
     return faces
 
 
-def coef_and_variable(coefs):
+def create_view_plane(coefs):
     line = ''
     variables = ['x', 'y', 'z']
 
@@ -146,11 +147,11 @@ def coef_and_variable(coefs):
 def create_view_print_planes(planes):
     line = []
     for plane in planes:
-        line.append(coef_and_variable(plane))
+        line.append(create_view_plane(plane))
     return line
 
 
-def print_correct_planes(planes):
+def print_planes(planes):
     planes_view = set(create_view_print_planes(planes))
     print(f"Number of faces: {len(planes_view)}")
     print("\n".join(sorted(planes_view, key=lambda x: x[-1])))
@@ -272,8 +273,10 @@ def polyhedral_graph(faces, tops):
 
     return graph
 
+
 def print_first_tops_graph(names_tops):
     print(f'  {'  '.join(names_tops)}')
+
 
 def print_intersections_graph(name_top, graph_vertex, graph_neighbor, count_vertex):
     print(name_top, end=' ')
@@ -282,7 +285,8 @@ def print_intersections_graph(name_top, graph_vertex, graph_neighbor, count_vert
         print('1' if i != graph_vertex and i in graph_neighbor else '0', end='  ')
     print()
 
-def print_neighbours_graph(graph):
+
+def print_adjacency_matrix(graph):
     print("Adjacency matrix")
     names_tops = full_names_tops(graph)[:len(graph)]
     print_first_tops_graph(names_tops)
@@ -292,24 +296,52 @@ def print_neighbours_graph(graph):
         print_intersections_graph(name_top, graph_vertex, graph_neighbor, len(graph))
 
 
+def print_vertex_edge_graph(faces, graph):
+    for face, graph_branch in zip(faces, graph.items()):
+        graph_vertex, graph_neighbor = graph_branch
+        graph_neighbor = [chr(ord('A') + num) for num in graph_neighbor]
+
+
+        edges = itertools.combinations(graph_neighbor, 2)
+        edge_strings = [''.join(edge) for edge in edges]
+
+        print(f"Face: {create_view_plane(face)}")
+        print(f"Vertices: {', '.join(graph_neighbor)}")
+        print(f"Edges: {', '.join(edge_strings)}")
+
+def control_file_format_v(points):
+    faces = find_convex_hull(points)
+    print_planes(faces)
+
+    tops = find_tops([coef[0] for coef in faces])
+    print_tops(tops)
+
+    graph = polyhedral_graph([coef[0] for coef in faces], tops)
+    print_adjacency_matrix(graph)
+    print_vertex_edge_graph(faces, graph)
+
+
+def control_file_format_h(points):
+    faces = [[p, "<="] for p in points]
+
+    tops = find_tops(points)
+    print_tops(tops)
+
+    graph = polyhedral_graph([coef[0] for coef in faces], tops)
+    print_adjacency_matrix(graph)
+    print_vertex_edge_graph(faces, graph)
+
 
 def main():
-    filepath = r'tets/test_4_H_tetrahedron.txt'
+    filepath = r'tets/test_3_octahedron.txt'
     is_file(filepath)
 
     file_format, points = read_coordinates(filepath)
 
     if file_format == 'V':
-        faces = find_convex_hull(points)
-        print_correct_planes(faces)
-        tops = find_tops([coef[0] for coef in faces])
-        print_tops(tops)
-        graph = polyhedral_graph([coef[0] for coef in faces], tops)
-        print_neighbours_graph(graph)
+        control_file_format_v(points)
     elif file_format == 'H':
-        faces = points
-        tops = find_tops(points)
-        print_tops(tops)
+        control_file_format_h(points)
 
 
 #    polyhedral_graph(faces, tops)
