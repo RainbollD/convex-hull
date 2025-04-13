@@ -201,8 +201,9 @@ def count_delta(three_points):
 def find_tops(points):
     tops = set()
     for three_points in combinations(points, 3):
-        coords = count_delta(three_points)  # Возвращает кортеж строк ("0.0", "0.0", "0.0")
-        tops.add(" ".join(coords))  # Сохраняем как строку "0.0 0.0 0.0"
+        if count3x3(three_points) != 0:
+            coords = count_delta(three_points)
+            tops.add(" ".join(coords))
     return tops
 
 
