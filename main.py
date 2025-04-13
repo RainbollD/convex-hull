@@ -58,9 +58,11 @@ def read_coordinates(filepath):
     try:
         with open(filepath, 'r') as file:
             file_content = file.read()
+
         file_format = file_content[0]
         coordinates = file_content[4:].split('\n')
         points = []
+
         if file_format == 'V':
             points = [PointsXYZ(*list(map(int, line.strip().split()))) for line in coordinates if line.strip()]
         elif file_format == 'H':
@@ -85,6 +87,7 @@ def transform_vector_normally(vect_normally, d):
     if plane_coef.a < 0: return plane_coef * (-1), -1
     if plane_coef.b < 0: return plane_coef * (-1), -1
     if plane_coef.c < 0: return plane_coef * (-1), -1
+
     return plane_coef, 1
 
 
@@ -99,6 +102,7 @@ def count_plane_three_points(coord):
     d = (vect_normally.x * a.x + vect_normally.y * a.y + vect_normally.z * a.z)
 
     plane_coef, do_change = transform_vector_normally(vect_normally, d)
+
     return plane_coef, do_change
 
 
@@ -108,21 +112,27 @@ def create_plane_formula(plane_coef):
 
 def is_one_side(plane, points, do_change):
     results = [plane(point.x, point.y, point.z) * do_change for point in points]
+
     if all(r >= 0 for r in results): return 1
     if all(r <= 0 for r in results): return -1
+
     return 0
 
 
 def find_convex_hull(points):
     faces = []
+
     for three_points in combinations(points, 3):
         if not is_one_line(three_points):
+
             plane_coef, do_change = count_plane_three_points(three_points)
             plane_formula = create_plane_formula(plane_coef)
             sign_inequality = is_one_side(plane_formula, points, do_change)
+
             if sign_inequality != 0:
                 sign = '>=' if sign_inequality * do_change >= 0 else '<='
                 faces.append([plane_coef, sign])
+
     return faces
 
 
@@ -196,6 +206,7 @@ def count_delta(three_points):
     delta_x = count_3x3_first_d(three_points, delta_a)
     delta_y = count_3x3_second_d(three_points, delta_a)
     delta_z = count_3x3_third_d(three_points, delta_a)
+
     return map(str, (delta_x, delta_y, delta_z))
 
 
@@ -205,6 +216,7 @@ def find_tops(points):
         if count3x3(three_points) != 0:
             coords = count_delta(three_points)
             tops.add(" ".join(coords))
+
     return tops
 
 
@@ -212,12 +224,15 @@ def full_names_tops(tops):
     names_tops = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
                   "U", "V", "W",
                   "X", "Y", "Z"]
+
     i = 0
     s = 1
+
     while len(names_tops) < len(tops):
         names_tops.append(names_tops[i] + str(s))
         if i % 25 == 0:
             s += 1
+
     return names_tops
 
 
@@ -280,14 +295,17 @@ def print_first_tops_graph(names_tops):
 
 def print_intersections_graph(name_top, graph_vertex, graph_neighbor, count_vertex):
     print(name_top, end=' ')
+
     graph_neighbor.sort()
     for i in range(count_vertex):
         print('1' if i != graph_vertex and i in graph_neighbor else '0', end='  ')
+
     print()
 
 
 def print_adjacency_matrix(graph):
     print("Adjacency matrix")
+
     names_tops = full_names_tops(graph)[:len(graph)]
     print_first_tops_graph(names_tops)
 
@@ -342,9 +360,6 @@ def main():
         control_file_format_v(points)
     elif file_format == 'H':
         control_file_format_h(points)
-
-
-#    polyhedral_graph(faces, tops)
 
 
 if __name__ == '__main__':
