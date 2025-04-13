@@ -224,7 +224,7 @@ def print_tops(tops):
     names_tops = full_names_tops(tops)
     print(f"Number of vertices: {len(tops)}")
     for name, top in zip(names_tops, tops):
-        print(f"{name}: {' '.join(list(top))}")
+        print(f"{name}: {''.join(top.strip())}")
 
 
 def polyhedral_graph(faces, tops):
@@ -294,7 +294,7 @@ def print_neighbours_graph(graph):
 
 
 def main():
-    filepath = r'tets/test_2_cube.txt'
+    filepath = r'tets/test_4_H_tetrahedron.txt'
     is_file(filepath)
 
     file_format, points = read_coordinates(filepath)
@@ -308,7 +308,6 @@ def main():
         print_neighbours_graph(graph)
     elif file_format == 'H':
         faces = points
-        print(points, type(points))
         tops = find_tops(points)
         print_tops(tops)
 
