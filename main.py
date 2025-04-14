@@ -317,6 +317,7 @@ def print_adjacency_matrix(vertices, adj_matrix):
 
 def find_face_vertices(vertices, face):
     face_vertices = []
+
     for name, vertex in vertices:
         if is_vertex_on_face(vertex, face):
             face_vertices.append(name)
