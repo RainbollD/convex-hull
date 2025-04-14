@@ -1,6 +1,7 @@
-import itertools
 import os
 from itertools import combinations
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 
 class PointsXYZ:
@@ -28,6 +29,17 @@ class PointsXYZ:
             return PointsXYZ(self.x * other, self.y * other, self.z * other)
         return NotImplemented
 
+    def __eq__(self, other):
+        if isinstance(other, PointsXYZ):
+            return self.x == other.x and self.y == other.y and self.z == other.z
+        return False
+
+    def __hash__(self):
+        return hash((self.x, self.y, self.z))
+
+    def to_tuple(self):
+        return (self.x, self.y, self.z)
+
 
 class PointsABCD:
     def __init__(self, a, b, c, d):
@@ -46,6 +58,19 @@ class PointsABCD:
 
     def __iter__(self):
         return iter((self.a, self.b, self.c, self.d))
+
+    def __eq__(self, other):
+        if isinstance(other, PointsABCD):
+            return (self.a, self.b, self.c, self.d) == (other.a, other.b, other.c, other.d)
+        elif isinstance(other, (tuple, list)) and len(other) == 4:
+            return (self.a, self.b, self.c, self.d) == tuple(other)
+        return False
+
+    def __hash__(self):
+        return hash((self.a, self.b, self.c, self.d))
+
+    def to_tuple(self):
+        return (self.a, self.b, self.c, self.d)
 
 
 def is_file(filepath):
@@ -81,16 +106,6 @@ def is_one_line(coord):
     return vect_ab * vect_ac == PointsXYZ(0, 0, 0)
 
 
-def transform_vector_normally(vect_normally, d):
-    plane_coef = PointsABCD(vect_normally.x, vect_normally.y, vect_normally.z, d)
-
-    if plane_coef.a < 0: return plane_coef * (-1), -1
-    if plane_coef.b < 0: return plane_coef * (-1), -1
-    if plane_coef.c < 0: return plane_coef * (-1), -1
-
-    return plane_coef, 1
-
-
 def count_plane_three_points(coord):
     a, b, c = coord
 
@@ -101,22 +116,26 @@ def count_plane_three_points(coord):
 
     d = (vect_normally.x * a.x + vect_normally.y * a.y + vect_normally.z * a.z)
 
-    plane_coef, do_change = transform_vector_normally(vect_normally, d)
-
-    return plane_coef, do_change
+    return PointsABCD(vect_normally.x, vect_normally.y, vect_normally.z, d)
 
 
 def create_plane_formula(plane_coef):
     return lambda x, y, z: (plane_coef.a * x + plane_coef.b * y + plane_coef.c * z - plane_coef.d)
 
 
-def is_one_side(plane, points, do_change):
-    results = [plane(point.x, point.y, point.z) * do_change for point in points]
+def is_one_side(plane, points):
+    results = [plane(point.x, point.y, point.z) for point in points]
 
     if all(r >= 0 for r in results): return 1
     if all(r <= 0 for r in results): return -1
 
     return 0
+
+
+def is_double_planes(plane_coef, faces):
+    for face in faces:
+        if plane_coef == face: return True
+    return False
 
 
 def find_convex_hull(points):
@@ -125,13 +144,17 @@ def find_convex_hull(points):
     for three_points in combinations(points, 3):
         if not is_one_line(three_points):
 
-            plane_coef, do_change = count_plane_three_points(three_points)
+            plane_coef = count_plane_three_points(three_points)
             plane_formula = create_plane_formula(plane_coef)
-            sign_inequality = is_one_side(plane_formula, points, do_change)
+            sign_inequality = is_one_side(plane_formula, points)
 
-            if sign_inequality != 0:
-                sign = '>=' if sign_inequality * do_change >= 0 else '<='
-                faces.append([plane_coef, sign])
+            if sign_inequality == 0: continue
+
+            if sign_inequality >= 0:
+                plane_coef *= -1
+
+            if not is_double_planes(plane_coef, faces):
+                faces.append(plane_coef)
 
     return faces
 
@@ -140,21 +163,21 @@ def create_view_plane(coefs):
     line = ''
     variables = ['x', 'y', 'z']
 
-    for coef, var in zip(coefs[0], variables):
+    for coef, var in zip(coefs, variables):
         if coef == 0:
-            line += ''
+            continue
         elif coef > 0:
             line += f"+ {coef}{var} " if coef != 1 else f"+ {var} "
         else:
             line += f"- {abs(coef)}{var} " if coef != -1 else f"- {var} "
 
-    line += f"{coefs[1]} {coefs[0].d}"
-    line = line[2:] if line[:2] == '+ ' else line
+    line += f"<= {coefs.d}"
+    line = line[2:] if line.startswith('+ ') else line
 
-    return line
+    return line.strip()
 
 
-def create_view_print_planes(planes):
+def create_list_view_planes(planes):
     line = []
     for plane in planes:
         line.append(create_view_plane(plane))
@@ -162,9 +185,15 @@ def create_view_print_planes(planes):
 
 
 def print_planes(planes):
-    planes_view = set(create_view_print_planes(planes))
+    planes_view = create_list_view_planes(planes)
     print(f"Number of faces: {len(planes_view)}")
-    print("\n".join(sorted(planes_view, key=lambda x: x[-1])))
+    print("\n".join(sorted(planes_view, key=lambda x: x[-1])), end='\n\n')
+
+
+def transform_float_to_int(top):
+    if int(top) == float(top):
+        return int(top)
+    return top
 
 
 def count3x3(three_points):
@@ -172,12 +201,6 @@ def count3x3(three_points):
     return (one.a * (two.b * three.c - two.c * three.b) -
             one.b * (two.a * three.c - two.c * three.a) +
             one.c * (two.a * three.b - two.b * three.a))
-
-
-def transform_float_to_int(top):
-    if int(top) == float(top):
-        return int(top)
-    return top
 
 
 def count_3x3_first_d(three_points, delta_a):
@@ -203,163 +226,218 @@ def count_3x3_third_d(three_points, delta_a):
 
 def count_delta(three_points):
     delta_a = count3x3(three_points)
+
+    if delta_a == 0:
+        return None
+
     delta_x = count_3x3_first_d(three_points, delta_a)
     delta_y = count_3x3_second_d(three_points, delta_a)
     delta_z = count_3x3_third_d(three_points, delta_a)
 
-    return map(str, (delta_x, delta_y, delta_z))
+    return (delta_x, delta_y, delta_z)
 
 
-def find_tops(points):
-    tops = set()
+def is_vertex_satisfies_inequalities(vertex, points):
+    for plane in points:
+        if plane.a * vertex.x + plane.b * vertex.y + plane.c * vertex.z > plane.d + 1e-8:
+            return False
+    return True
+
+
+def find_vertices(points):
+    vertices = set()
+
     for three_points in combinations(points, 3):
-        if count3x3(three_points) != 0:
-            coords = count_delta(three_points)
-            tops.add(" ".join(coords))
+        coords = count_delta(three_points)
+        if coords is not None:
+            vertex = PointsXYZ(*coords)
 
-    return tops
+            if is_vertex_satisfies_inequalities(vertex, points):
+                vertices.add(vertex)
 
-
-def full_names_tops(tops):
-    names_tops = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
-                  "U", "V", "W",
-                  "X", "Y", "Z"]
-
-    i = 0
-    s = 1
-
-    while len(names_tops) < len(tops):
-        names_tops.append(names_tops[i] + str(s))
-        if i % 25 == 0:
-            s += 1
-
-    return names_tops
+    return sorted(vertices, key=lambda v: (v.x, v.y, v.z))
 
 
-def print_tops(tops):
-    names_tops = full_names_tops(tops)
-    print(f"Number of vertices: {len(tops)}")
-    for name, top in zip(names_tops, tops):
-        print(f"{name}: {''.join(top.strip())}")
+def full_names_vertices(vertices):
+    names = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+             "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+
+    result = []
+    for i, vertex in enumerate(vertices):
+        if i < 26:
+            result.append((names[i], vertex))
+        else:
+            result.append((f"{names[i % 26]}{i // 26}", vertex))
+    return result
 
 
-def polyhedral_graph(faces, tops):
-    """
-    Строит полиэдральный граф на основе граней и вершин.
-
-    Args:
-        faces (list): Список граней (каждая грань — это объект PointsABCD).
-        tops (set): Множество вершин в формате строк "x y z".
-
-    Returns:
-        dict: Граф в виде словаря смежности.
-    """
-    # Преобразуем tops в список кортежей с float-координатами
-    points = [tuple(map(float, top.split())) for top in tops]
-
-    # Создаем словарь для хранения индексов вершин
-    vertex_index = {point: idx for idx, point in enumerate(points)}
-
-    edges = set()
-
-    for face in faces:
-        a, b, c, d = face.a, face.b, face.c, face.d
-
-        # Находим вершины, лежащие на этой грани
-        vertices_on_face = []
-        for point in points:
-            x, y, z = point
-            if abs(a * x + b * y + c * z - d) < 1e-6:
-                vertices_on_face.append(vertex_index[point])
-
-        # Соединяем вершины в цикле
-        n = len(vertices_on_face)
-        for j in range(n):
-            v1 = vertices_on_face[j]
-            v2 = vertices_on_face[(j + 1) % n]
-            edges.add(frozenset({v1, v2}))
-
-    # Строим граф
-    graph = {i: [] for i in range(len(points))}
-    for edge in edges:
-        v1, v2 = edge
-        graph[v1].append(v2)
-        graph[v2].append(v1)
-
-    return graph
+def print_vertices(vertices):
+    named_vertices = full_names_vertices(vertices)
+    print(f"Number of vertices: {len(named_vertices)}")
+    for name, vertex in named_vertices:
+        print(f"{name}: {vertex.x} {vertex.y} {vertex.z}")
+    print()
+    return named_vertices
 
 
-def print_first_tops_graph(names_tops):
-    print(f'  {'  '.join(names_tops)}')
+def is_vertex_on_face(vertex, face):
+    return abs(face.a * vertex.x + face.b * vertex.y + face.c * vertex.z - face.d) < 1e-8
 
 
-def print_intersections_graph(name_top, graph_vertex, graph_neighbor, count_vertex):
-    print(name_top, end=' ')
+def build_adjacency_matrix(vertices, faces):
+    n = len(vertices)
+    adj = [[0] * n for _ in range(n)]
 
-    graph_neighbor.sort()
-    for i in range(count_vertex):
-        print('1' if i != graph_vertex and i in graph_neighbor else '0', end='  ')
+    for i in range(n):
+        for j in range(i + 1, n):
+            shared_faces = 0
+            for face in faces:
+                if is_vertex_on_face(vertices[i][1], face) and is_vertex_on_face(vertices[j][1], face):
+                    shared_faces += 1
+                    if shared_faces > 2:
+                        break
+            if shared_faces == 2:
+                adj[i][j] = 1
+                adj[j][i] = 1
 
+    return adj
+
+
+def print_adjacency_matrix(vertices, adj_matrix):
+    print("Adjacency matrix")
+    names = [v[0] for v in vertices]
+
+    print("  " + " ".join(names))
+
+    for i in range(len(vertices)):
+        row = [str(adj_matrix[i][j]) for j in range(len(vertices))]
+        print(names[i] + " " + " ".join(row))
     print()
 
 
-def print_adjacency_matrix(graph):
-    print("Adjacency matrix")
-
-    names_tops = full_names_tops(graph)[:len(graph)]
-    print_first_tops_graph(names_tops)
-
-    for name_top, graph_branch in zip(names_tops, graph.items()):
-        graph_vertex, graph_neighbor = graph_branch
-        print_intersections_graph(name_top, graph_vertex, graph_neighbor, len(graph))
+def find_face_vertices(vertices, face):
+    face_vertices = []
+    for name, vertex in vertices:
+        if is_vertex_on_face(vertex, face):
+            face_vertices.append(name)
+    return face_vertices
 
 
-def print_vertex_edge_graph(faces, graph):
-    for face, graph_branch in zip(faces, graph.items()):
-        graph_vertex, graph_neighbor = graph_branch
-        graph_neighbor = [chr(ord('A') + num) for num in graph_neighbor]
+def find_edges(face_vertices):
+    edges = []
+
+    for i in range(len(face_vertices)):
+        for j in range(i + 1, len(face_vertices)):
+            edges.append(f"{face_vertices[i]}{face_vertices[j]}")
+
+    return edges
 
 
-        edges = itertools.combinations(graph_neighbor, 2)
-        edge_strings = [''.join(edge) for edge in edges]
+def print_face_info(faces, vertices):
+    for face in faces:
+        face_vertices = find_face_vertices(vertices, face)
+        edges = find_edges(face_vertices)
 
         print(f"Face: {create_view_plane(face)}")
-        print(f"Vertices: {', '.join(graph_neighbor)}")
-        print(f"Edges: {', '.join(edge_strings)}")
-
-def control_file_format_v(points):
-    faces = find_convex_hull(points)
-    print_planes(faces)
-
-    tops = find_tops([coef[0] for coef in faces])
-    print_tops(tops)
-
-    graph = polyhedral_graph([coef[0] for coef in faces], tops)
-    print_adjacency_matrix(graph)
-    print_vertex_edge_graph(faces, graph)
+        print(f"Vertices: {', '.join(face_vertices)}")
+        print(f"Edges: {', '.join(edges)}")
+        print()
 
 
-def control_file_format_h(points):
-    faces = [[p, "<="] for p in points]
+def minkowski_difference(poly1, poly2):
+    all_faces = poly1 + poly2
 
-    tops = find_tops(points)
-    print_tops(tops)
-
-    graph = polyhedral_graph([coef[0] for coef in faces], tops)
-    print_adjacency_matrix(graph)
-    print_vertex_edge_graph(faces, graph)
+    for face in all_faces:
+        if face.a * 0 + face.b * 0 + face.c * 0 > face.d + 1e-8:
+            return False
+    return True
 
 
-def main():
-    filepath = r'tets/test_3_octahedron.txt'
+def get_face_vertices(faces, vertices):
+    face_vertices = []
+    for face in faces:
+        fv = []
+        for vertex in vertices:
+            if is_vertex_on_face(vertex, face):
+                fv.append(vertex.to_tuple())
+        if len(fv) >= 3:
+            face_vertices.append(fv)
+    return face_vertices
+
+
+def plot_polyhedron(vertices, faces, ax, color='b', alpha=0.2):
+    face_verts = get_face_vertices(faces, vertices)
+
+    for fv in face_verts:
+        poly = Poly3DCollection([fv], alpha=alpha, linewidths=1, edgecolors='k')
+        poly.set_facecolor(color)
+        ax.add_collection3d(poly)
+
+    xs = [v.x for v in vertices]
+    ys = [v.y for v in vertices]
+    zs = [v.z for v in vertices]
+    ax.scatter(xs, ys, zs, color=color, s=50)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    min_z, max_z = min(zs), max(zs)
+
+    max_range = max(max_x - min_x, max_y - min_y, max_z - min_z) * 0.5
+    mid_x = (max_x + min_x) * 0.5
+    mid_y = (max_y + min_y) * 0.5
+    mid_z = (max_z + min_z) * 0.5
+
+    ax.set_xlim(mid_x - max_range, mid_x + max_range)
+    ax.set_ylim(mid_y - max_range, mid_y + max_range)
+    ax.set_zlim(mid_z - max_range, mid_z + max_range)
+
+
+def process_file(filepath):
     is_file(filepath)
-
     file_format, points = read_coordinates(filepath)
 
     if file_format == 'V':
-        control_file_format_v(points)
+        faces = find_convex_hull(points)
+        print_planes(faces)
     elif file_format == 'H':
-        control_file_format_h(points)
+        faces = points
+
+    vertices = find_vertices(faces)
+    named_vertices = print_vertices(vertices)
+
+    adj_matrix = build_adjacency_matrix(named_vertices, faces)
+    print_adjacency_matrix(named_vertices, adj_matrix)
+    print_face_info(faces, named_vertices)
+
+    return faces, vertices
+
+
+def main():
+    filepath = r'tets/test_4_H_tetrahedron.txt'
+    faces1, vertices1 = process_file(filepath)
+
+    filepath = r'tets/test_3_octahedron.txt'
+    faces2, vertices2 = process_file(filepath)
+
+    collides = minkowski_difference(faces1, faces2)
+    print("\nCollision detection:")
+    print("The polyhedrons", "intersect" if collides else "do not intersect")
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    plot_polyhedron(vertices1, faces1, ax)
+    plt.title("3D Polyhedron")
+    plt.show()
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    plot_polyhedron(vertices2, faces2, ax)
+    plt.title("3D Polyhedron")
+    plt.show()
 
 
 if __name__ == '__main__':
