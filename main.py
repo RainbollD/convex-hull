@@ -349,12 +349,12 @@ def build_adjacency_matrix(vertices, faces):
             if shared_faces == 2:
                 adj[i][j] = 1
                 adj[j][i] = 1
-
     return adj
 
 
 def print_adjacency_matrix(vertices, adj_matrix):
     print("Adjacency matrix")
+
     names = [v[0] for v in vertices]
 
     print("  " + " ".join(names))
@@ -414,41 +414,31 @@ def minkowski_difference(poly1, poly2):
     print_collides(collides)
 
 
-def get_face_vertices(faces, vertices):
+def get_face_vertices(named_vertices, adj_matrix):
     face_vertices = []
-    for face in faces:
-        fv = []
-        for vertex in vertices:
-            if is_vertex_on_face(vertex, face):
-                fv.append(vertex.to_tuple())
-        if len(fv) >= 3:
-            face_vertices.append(fv)
+    half_amount_vertices = int(len(named_vertices)/2)
+
+    for index_adj_matrix, row in enumerate(adj_matrix):
+        for index, connection in enumerate(row):
+            if connection == 1:
+                face_vertices.append([named_vertices[index_adj_matrix][1], named_vertices[index][1]])
     return face_vertices
 
 
-def preparation_plot_polyhedron(vertices, faces, named_vertices):
-    """Create environment for figure"""
-    for vertice, face,  named_vertice in zip(vertices, faces, named_vertices):
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection='3d')
-        plot_polyhedron(vertice, face, named_vertice,ax)
-        plt.title("3D")
-        plt.show()
-
-
-def plot_polyhedron(vertices, faces, named_vertices, ax, color='b', alpha=0):
+def plot_polyhedron(vertices, named_vertices, ax, adj_matrix, alpha=0):
     """Figure visualization"""
-    face_verts = get_face_vertices(faces, vertices)
+    face_verts = get_face_vertices(named_vertices, adj_matrix)
 
     for fv in face_verts:
+        fv = [element.to_tuple() for element in fv]
         poly = Poly3DCollection([fv], alpha=alpha, linewidths=1, edgecolors='k')
-        poly.set_facecolor(color)
+        poly.set_facecolor('blue')
         ax.add_collection3d(poly)
 
     xs = [v.x for v in vertices]
     ys = [v.y for v in vertices]
     zs = [v.z for v in vertices]
-    ax.scatter(xs, ys, zs, color=color, s=50)
+    ax.scatter(xs, ys, zs, color='blue', s=25)
 
     for vert in named_vertices:
         label = f"{vert[0]}({vert[1].x}, {vert[1].y}, {vert[1].z})"
@@ -472,6 +462,16 @@ def plot_polyhedron(vertices, faces, named_vertices, ax, color='b', alpha=0):
     ax.set_zlim(mid_z - max_range, mid_z + max_range)
 
 
+def preparation_plot_polyhedron(vertices, faces, named_vertices, adj_matrix):
+    """Create environment for figure"""
+    for vertice, face, named_vertice in zip(vertices, faces, named_vertices):
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        plot_polyhedron(vertice,  named_vertices=named_vertice, ax=ax, adj_matrix=adj_matrix)
+        plt.title("3D")
+        plt.show()
+
+
 def process_file(filepath):
     """
     Function:
@@ -482,7 +482,6 @@ def process_file(filepath):
     :param filepath:
     :return: faces, vertices <type: list>
     """
-
 
     file_format, points = read_coordinates(filepath)
 
@@ -501,7 +500,7 @@ def process_file(filepath):
     adj_matrix = build_adjacency_matrix(named_vertices, faces)
     print_adjacency_matrix(named_vertices, adj_matrix)
     print_face_info(faces, named_vertices)
-    return faces, vertices, named_vertices
+    return faces, vertices, named_vertices, adj_matrix
 
 
 def get_info_console():
@@ -520,16 +519,16 @@ def main():
     3) Visualization figures
     :return:
     """
-    string_console_data = get_info_console()
+    string_console_data = ["tets/test_4_H_tetrahedron.txt"]  # get_info_console()
 
     filepaths = is_file(string_console_data)
 
     if len(filepaths) == 2:
         filepath = filepaths[0]
-        faces1, vertices1, named_vertices1 = process_file(filepath)
+        faces1, vertices1, named_vertices1, adj_matrix = process_file(filepath)
 
         filepath = filepaths[1]
-        faces2, vertices2, named_vertices2 = process_file(filepath)
+        faces2, vertices2, named_vertices2, adj_matrix = process_file(filepath)
 
         minkowski_difference(faces1, faces2)
 
@@ -539,7 +538,7 @@ def main():
 
     elif len(filepaths) == 1:
         filepath = filepaths[0]
-        faces1, vertices1, named_vertices = process_file(filepath)
+        faces1, vertices1, named_vertices, adj_matrix = process_file(filepath)
 
         vertices = [vertices1]
         faces = [faces1]
@@ -550,7 +549,7 @@ def main():
               f"Количество путей к файлу должно быть: 1 или 2")
         quit(0)
 
-    preparation_plot_polyhedron(vertices, faces, named_vertices)
+    preparation_plot_polyhedron(vertices, faces, named_vertices, adj_matrix)
 
 
 if __name__ == '__main__':
