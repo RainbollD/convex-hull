@@ -335,6 +335,14 @@ def is_vertex_on_face(vertex, face):
 
 
 def build_adjacency_matrix(vertices, faces):
+    """
+    Build adjacency matrix
+    Idea: if two vertices are on two the same faces, then they have an edge
+    :param vertices: List format: [(vertice,(x,y,z)), ...] - name vertice and coordinates
+    :param faces: coefficients of plane
+    :return: binary matrix, where 1 if there's the general plane else 0
+    """
+
     n = len(vertices)
     adj = [[0] * n for _ in range(n)]
 
@@ -415,8 +423,14 @@ def minkowski_difference(poly1, poly2):
 
 
 def get_face_vertices(named_vertices, adj_matrix):
+    """
+    Function connects vertices in one list
+    :param named_vertices:
+    :param adj_matrix:
+    :return:
+    """
+
     face_vertices = []
-    half_amount_vertices = int(len(named_vertices)/2)
 
     for index_adj_matrix, row in enumerate(adj_matrix):
         for index, connection in enumerate(row):
