@@ -82,6 +82,9 @@ def is_file(filepaths):
             print(f"Файл {filepath} не найден.\n")
             continue
         works_filepath.append(filepath)
+
+    if len(works_filepath) == 0: quit(0)
+
     return works_filepath
 
 
@@ -438,7 +441,6 @@ def get_face_vertices(named_vertices, adj_matrix):
     """
 
     face_vertices = []
-
     for index_adj_matrix, row in enumerate(adj_matrix):
         for index, connection in enumerate(row):
             if connection == 1:
@@ -511,9 +513,9 @@ def plot_figure(vertices, named_vertices, ax, adj_matrix):
     plot_correct_graphic_with_figure(xs, ys, zs, ax)
 
 
-def preparation_plot_polyhedron(vertices, faces, named_vertices, adj_matrix):
+def preparation_plot_polyhedron(vertices, faces, named_vertices, adj_matrices):
     """Create environment for figure"""
-    for vertice, face, named_vertice in zip(vertices, faces, named_vertices):
+    for vertice, face, named_vertice, adj_matrix in zip(vertices, faces, named_vertices, adj_matrices):
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection='3d')
         plot_figure(vertice, named_vertices=named_vertice, ax=ax, adj_matrix=adj_matrix)
@@ -574,16 +576,17 @@ def main():
 
     if len(filepaths) == 2:
         filepath = filepaths[0]
-        faces1, vertices1, named_vertices1, adj_matrix = process_file(filepath)
+        faces1, vertices1, named_vertices1, adj_matrix1 = process_file(filepath)
 
         filepath = filepaths[1]
-        faces2, vertices2, named_vertices2, adj_matrix = process_file(filepath)
+        faces2, vertices2, named_vertices2, adj_matrix2 = process_file(filepath)
 
         minkowski_difference(faces1, faces2)
 
         vertices = [vertices1, vertices2]
         faces = [faces1, faces2]
         named_vertices = [named_vertices1, named_vertices2]
+        adj_matrices = [adj_matrix1, adj_matrix2]
 
     elif len(filepaths) == 1:
         filepath = filepaths[0]
@@ -592,13 +595,15 @@ def main():
         vertices = [vertices1]
         faces = [faces1]
         named_vertices = [named_vertices]
+        adj_matrices = [adj_matrix]
 
     else:
         print(f"Неправильные данные.\n"
-              f"Количество путей к файлу должно быть: 1 или 2")
+              f"Количество путей к файлу должно быть равно: 1 или 2.\n"
+              f"Вы ввели {len(filepaths)}.")
         quit(0)
 
-    preparation_plot_polyhedron(vertices, faces, named_vertices, adj_matrix)
+    preparation_plot_polyhedron(vertices, faces, named_vertices, adj_matrices)
 
 
 if __name__ == '__main__':
