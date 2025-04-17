@@ -284,24 +284,31 @@ def is_vertex_satisfies_inequalities(vertex, points):
     return True
 
 
-def find_vertices(points):
+def is_any_vertices(vertices):
+    if len(vertices) == 0:
+        print(f"Не получается найти вершины фигуры.")
+        quit(0)
+
+
+def find_vertices(coefs_plane):
     """
     Finding the vertices.
     Functions:
     1) Construct combinations of 3 points
     2) Calculate the vertices
-    :param points: points in the space
+    :param coefs_plane: coefs_plane in the space
     :return: set of vertices'
     """
     vertices = set()
-
-    for three_points in combinations(points, 3):
-        coords = count_delta(three_points)
+    for three_coefs_plane in combinations(coefs_plane, 3):
+        coords = count_delta(three_coefs_plane)
         if coords is not None:
             vertex = PointsXYZ(*coords)
 
-            if is_vertex_satisfies_inequalities(vertex, points):
+            if is_vertex_satisfies_inequalities(vertex, coefs_plane):
                 vertices.add(vertex)
+
+    is_any_vertices(vertices)
 
     return sorted(vertices, key=lambda v: (v.x, v.y, v.z))
 
@@ -399,7 +406,7 @@ def print_face_info(faces, vertices):
 
         print(f"Face: {create_view_plane(face)}")
         print(f"Vertices: {', '.join(face_vertices)}")
-        print(f"Edges: {', '.join(edges)}")
+        print(f"Edges: {', '.join(edges)}" if len(edges) else "Edges: Empty")
         print()
 
 
@@ -439,29 +446,40 @@ def get_face_vertices(named_vertices, adj_matrix):
     return face_vertices
 
 
-def plot_polyhedron(vertices, named_vertices, ax, adj_matrix, alpha=0):
-    """Figure visualization"""
-    face_verts = get_face_vertices(named_vertices, adj_matrix)
-
+def plot_edges(face_verts, ax):
+    """Draw edges"""
     for fv in face_verts:
         fv = [element.to_tuple() for element in fv]
-        poly = Poly3DCollection([fv], alpha=alpha, linewidths=1, edgecolors='k')
+        poly = Poly3DCollection([fv], alpha=0, linewidths=1, edgecolors='k')
         poly.set_facecolor('blue')
         ax.add_collection3d(poly)
 
+
+def plot_vertices_without_name(vertices, ax):
+    """Draw vertices without name and coordinates"""
     xs = [v.x for v in vertices]
     ys = [v.y for v in vertices]
     zs = [v.z for v in vertices]
     ax.scatter(xs, ys, zs, color='blue', s=25)
+    return xs, ys, zs
 
+
+def plot_names_vertices(named_vertices, ax):
+    """Draw name and coordinates fot vertices"""
     for vert in named_vertices:
         label = f"{vert[0]}({vert[1].x}, {vert[1].y}, {vert[1].z})"
         ax.text(vert[1].x, vert[1].y, vert[1].z, label, color='purple', fontsize=12)
 
+
+def plot_name_labels(ax):
+    """Draw names for coordinate axis"""
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
+
+def plot_correct_graphic_with_figure(xs, ys, zs, ax):
+    """Make graphic and coordinate axis from one point"""
     min_x, max_x = min(xs), max(xs)
     min_y, max_y = min(ys), max(ys)
     min_z, max_z = min(zs), max(zs)
@@ -476,12 +494,29 @@ def plot_polyhedron(vertices, named_vertices, ax, adj_matrix, alpha=0):
     ax.set_zlim(mid_z - max_range, mid_z + max_range)
 
 
+def plot_figure(vertices, named_vertices, ax, adj_matrix):
+    """Figure visualization"""
+    face_vertices = get_face_vertices(named_vertices, adj_matrix)
+
+    plot_edges(face_vertices, ax)
+
+    xs, ys, zs = plot_vertices_without_name(vertices, ax)
+
+    plot_names_vertices(named_vertices, ax)
+
+    if len(vertices) == 1: return
+
+    plot_name_labels(ax)
+
+    plot_correct_graphic_with_figure(xs, ys, zs, ax)
+
+
 def preparation_plot_polyhedron(vertices, faces, named_vertices, adj_matrix):
     """Create environment for figure"""
     for vertice, face, named_vertice in zip(vertices, faces, named_vertices):
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection='3d')
-        plot_polyhedron(vertice,  named_vertices=named_vertice, ax=ax, adj_matrix=adj_matrix)
+        plot_figure(vertice, named_vertices=named_vertice, ax=ax, adj_matrix=adj_matrix)
         plt.title("3D")
         plt.show()
 
@@ -533,7 +568,7 @@ def main():
     3) Visualization figures
     :return:
     """
-    string_console_data = ["tets/test_4_H_tetrahedron.txt"]  # get_info_console()
+    string_console_data = get_info_console()
 
     filepaths = is_file(string_console_data)
 
